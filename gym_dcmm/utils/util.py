@@ -63,7 +63,10 @@ def calculate_arm_Te(pose, quate):
         arm_ee_quat = np.quaternion(quate[0], quate[1], quate[2], quate[3])
     # Calculate forward kinematics (Tep) for the target end-effector pose
     res = np.zeros(9)
-    mujoco.mju_quat2Mat(res, np.array([arm_ee_quat.w, arm_ee_quat.x, arm_ee_quat.y, arm_ee_quat.z]))
+
+    mujoco.mju_quat2Mat(res, np.array([arm_ee_quat.x, arm_ee_quat.y, arm_ee_quat.z, arm_ee_quat.w]))
+    # old，需要注意quaternion的顺序，这个没有特别确定，后续需要确认并且写在debug文档中
+    # mujoco.mju_quat2Mat(res, np.array([arm_ee_quat.w, arm_ee_quat.x, arm_ee_quat.y, arm_ee_quat.z]))
     Te = np.eye(4)
     Te[:3,3] = pose
     Te[:3,:3] = res.reshape((3,3))

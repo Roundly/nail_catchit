@@ -179,6 +179,7 @@ class IK(ABC):
 
             # Check if q exceeds the limits
             if q[i] < ql0 or q[i] > ql1:
+                print(f"Joint {i} out of limits: {q[i]} not in [{ql0}, {ql1}]")
                 # print("i: ", i)
                 # print("q[i]: ", q[i])
                 # print("ql0: ", ql0)
