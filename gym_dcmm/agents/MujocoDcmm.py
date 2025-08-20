@@ -55,7 +55,8 @@ class MJ_DCMM(object):
                  viewer=True, 
                  object_name='object',
                  object_eval=False, 
-                 timestep=0.001):   "在原始项目中为0.002，但是目前模型仿真出现问题，暂时改为0.001"
+                 timestep=0.001):   
+        #"在原始项目中为0.002，但是目前模型仿真出现问题，暂时改为0.001"
         self.viewer = None
         self.open_viewer = viewer
         # Load the MuJoCo model
@@ -292,7 +293,7 @@ class MJ_DCMM(object):
     def set_throw_pos_vel(self, 
                           pose = np.array([0, 0, 0, 1, 0, 0, 0]), 
                           velocity = np.array([0, 0, 0, 0, 0, 0])):
-                """
+        """
         Set the position and velocity for throwing action.
         设置投掷动作的目标位置和速度。
 
@@ -302,6 +303,7 @@ class MJ_DCMM(object):
             velocity: corresponding velocity of the object
                       物体的速度信息
         """
+                
         self.data.qpos[24:31] = pose
         self.data.qvel[24:30] = velocity
         # self.data.qpos[37:44] = pose

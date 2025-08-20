@@ -13,12 +13,12 @@ viewer: False
 imshow_cam: False
 # RL Arguments
 test: False # False, True
-task: Tracking # Catching_TwoStage, Catching_OneStage, Tracking
-num_envs: 32 # This should be no more than 2x your CPUs (1x is recommended)
+task: Catching_TwoStage # Catching_TwoStage, Catching_OneStage, Tracking
+num_envs: 8 # This should be no more than 2x your CPUs (1x is recommended)
 object_eval: False
 # used to set checkpoint path
-checkpoint_tracking: ''
-checkpoint_catching: ''
+checkpoint_tracking: 'assets/models/track.pth'
+checkpoint_catching: 'assets/models/5.11ep_18000_step_0009m_reward_-39.17.pth'
 # checkpoint_tracking: 'assets/models/track.pth'
 # checkpoint_catching: 'assets/models/catch_two_stage.pth'
 
