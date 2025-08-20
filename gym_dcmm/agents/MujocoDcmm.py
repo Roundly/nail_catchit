@@ -1,8 +1,6 @@
 """
-Author: Yuanhang Zhang
-Version@2024-10-17
-All Rights Reserved
-ABOUT: this file constains the basic class of the DexCatch with Mobile Manipulation (DCMM) in the MuJoCo simulation environment.
+ABOUT: this file contains the basic class of the DexCatch with Mobile Manipulation (DCMM) in the MuJoCo simulation environment.
+关于: 此文件包含在 MuJoCo 仿真环境中 DexCatch 移动操作（DCMM） 的基本类。
 """
 import os, sys
 sys.path.append(os.path.abspath('../'))
@@ -57,7 +55,7 @@ class MJ_DCMM(object):
                  viewer=True, 
                  object_name='object',
                  object_eval=False, 
-                 timestep=0.002):
+                 timestep=0.001):   "在原始项目中为0.002，但是目前模型仿真出现问题，暂时改为0.001"
         self.viewer = None
         self.open_viewer = viewer
         # Load the MuJoCo model
@@ -77,9 +75,15 @@ class MJ_DCMM(object):
         self.model_arm.opt.timestep = timestep
         self.data = mujoco.MjData(self.model)
         self.data_arm = mujoco.MjData(self.model_arm)
+        self.data.qpos[2:8] = DcmmCfg.arm_joints[:]
+        self.data.qpos[8:24] = DcmmCfg.hand_joints[:]
+        self.data_arm.qpos[0:6] = DcmmCfg.arm_joints[:]
+    
+        '''
         self.data.qpos[15:21] = DcmmCfg.arm_joints[:]
         self.data.qpos[21:37] = DcmmCfg.hand_joints[:]
         self.data_arm.qpos[0:6] = DcmmCfg.arm_joints[:]
+        '''
 
         mujoco.mj_forward(self.model, self.data)
         mujoco.mj_forward(self.model_arm, self.data_arm)
@@ -92,8 +96,7 @@ class MJ_DCMM(object):
         try:
             _ = self.data.body(object_name)
         except:
-            print("The object name is not found in the model!\
-                  \nPlease check the object name in the .xml file.")
+            print("The object name is not found in the model!\\nPlease check the object name in the .xml file.")
             raise ValueError
         self.object_name = object_name
         # Get the geom id of the hand, the floor and the object
@@ -104,14 +107,17 @@ class MJ_DCMM(object):
         # Mobile Base Control
         self.rp_base = np.zeros(3)
         self.rp_ref_base = np.zeros(3)
-        self.drive_pid = PID("drive", DcmmCfg.Kp_drive, DcmmCfg.Ki_drive, DcmmCfg.Kd_drive, dim=4, llim=DcmmCfg.llim_drive, ulim=DcmmCfg.ulim_drive, debug=False)
-        self.steer_pid = PID("steer", DcmmCfg.Kp_steer, DcmmCfg.Ki_steer, DcmmCfg.Kd_steer, dim=4, llim=DcmmCfg.llim_steer, ulim=DcmmCfg.ulim_steer, debug=False)
+        # "修改PID的赋值方式，删去阿克曼轮的转向steer关节pid"
+        self.drive_pid = PID("drive", DcmmCfg.Kp_drive, DcmmCfg.Ki_drive, DcmmCfg.Kd_drive, dim=2, llim=DcmmCfg.llim_drive, ulim=DcmmCfg.ulim_drive, debug=False)
+        
         self.arm_pid = PID("arm", DcmmCfg.Kp_arm, DcmmCfg.Ki_arm, DcmmCfg.Kd_arm, dim=6, llim=DcmmCfg.llim_arm, ulim=DcmmCfg.ulim_arm, debug=False)
+        
         self.hand_pid = PID("hand", DcmmCfg.Kp_hand, DcmmCfg.Ki_hand, DcmmCfg.Kd_hand, dim=16, llim=DcmmCfg.llim_hand, ulim=DcmmCfg.ulim_hand, debug=False)
+        
         self.cmd_lin_y = 0.0
         self.cmd_lin_x = 0.0
         self.arm_act = False
-        self.steer_ang = np.array([0.0, 0.0, 0.0, 0.0])
+
         self.drive_vel = np.array([0.0, 0.0, 0.0, 0.0])
 
         ## Define Inverse Kinematics Solver for the Arm
@@ -124,7 +130,7 @@ class MJ_DCMM(object):
         self.create_camera_data(DcmmCfg.cam_config["width"], DcmmCfg.cam_config["height"], DcmmCfg.cam_config["name"])
 
         ## Initialize the target velocity of the mobile base
-        self.target_base_vel = np.zeros(3)
+        self.target_base_vel = np.zeros(2)
         self.target_arm_qpos = np.zeros(6)
         self.target_hand_qpos = np.zeros(16)
         ## Initialize the target joint positions of the arm
@@ -132,14 +138,16 @@ class MJ_DCMM(object):
         ## Initialize the target joint positions of the hand
         self.target_hand_qpos[:] = DcmmCfg.hand_joints[:]
 
+        # Storage for IK solution / 存储逆运动学求解结果
         self.ik_solution = np.zeros(6)
 
+        # Store the last few velocities / 存储最近的速度数据
         self.vel_history = deque(maxlen=4)  # store the last 2 velocities
         self.vel_init = False
 
-        self.drive_ctrlrange = self.model.actuator(4).ctrlrange
-        self.steer_ctrlrange = self.model.actuator(0).ctrlrange
-
+        self.drive_ctrlrange = self.model.actuator(2).ctrlrange
+        #self.drive_ctrlrange = self.model.actuator(2).ctrlrange
+        
     def show_model_info(self):
         """
         Displays relevant model info for the user, namely bodies, joints, actuators, as well as their IDs and ranges.
@@ -177,13 +185,7 @@ class MJ_DCMM(object):
                 self.drive_pid.Kd,
             )
         )
-        print(
-            "Steer, P: {}, I: {}, D: {}".format(
-                self.steer_pid.Kp,
-                self.steer_pid.Ki,
-                self.steer_pid.Kd,
-            )
-        )
+
         print("\nArm PID Info: \n")
         print(
             "P: {}, I: {}, D: {}".format(
@@ -225,24 +227,22 @@ class MJ_DCMM(object):
         ####################
         # Mobile base steering and driving control 
         # TODO: angular velocity is not correct when the robot is self-rotating.
-        current_steer_pos = np.array([self.data.joint("steer_fl").qpos[0],
-                                      self.data.joint("steer_fr").qpos[0], 
-                                      self.data.joint("steer_rl").qpos[0],
-                                      self.data.joint("steer_rr").qpos[0]])
-        current_drive_vel = np.array([self.data.joint("drive_fl").qvel[0],
-                                      self.data.joint("drive_fr").qvel[0], 
-                                      self.data.joint("drive_rl").qvel[0],
-                                      self.data.joint("drive_rr").qvel[0]])
-        mv_steer = self.steer_pid.update(self.steer_ang, current_steer_pos, self.data.time)
+
+        current_drive_vel = np.array([self.data.joint("joint_x").qvel[0],
+                                      self.data.joint("joint_y").qvel[0]])
+        
+
         mv_drive = self.drive_pid.update(self.drive_vel, current_drive_vel, self.data.time)
-        if np.all(current_drive_vel > 0.0) and np.all(current_drive_vel < self.drive_vel):
-            mv_drive = np.clip(mv_drive, 0, self.drive_ctrlrange[1] / 10.0)
-        if np.all(current_drive_vel < 0.0) and np.all(current_drive_vel > self.drive_vel):
-            mv_drive = np.clip(mv_drive, self.drive_ctrlrange[0] / 10.0, 0)
+        # if np.all(current_drive_vel > 0.0) and np.all(current_drive_vel < self.drive_vel):
+        #     mv_drive = np.clip(mv_drive, 0, self.drive_ctrlrange[1] / 10.0)
+        # if np.all(current_drive_vel < 0.0) and np.all(current_drive_vel > self.drive_vel):
+        #     mv_drive = np.clip(mv_drive, self.drive_ctrlrange[0] / 10.0, 0)
         
-        mv_steer = np.clip(mv_steer, self.steer_ctrlrange[0], self.steer_ctrlrange[1])
+        #下行不确定需要不需要
+        mv_drive = np.clip(mv_drive, self.drive_ctrlrange[0], self.drive_ctrlrange[1])
+        #mv_steer = np.clip(mv_steer, self.steer_ctrlrange[0], self.steer_ctrlrange[1])
         
-        return mv_steer, mv_drive
+        return mv_drive
     
     def move_ee_pose(self, delta_pose):
         """
@@ -250,8 +250,16 @@ class MJ_DCMM(object):
         delta_pose[0:3]: delta x,y,z
         delta_pose[3:6]: delta euler angles roll, pitch, yaw
 
+        Args:
+            delta_pose[0:3]: delta x,y,z offset for position
+                             位置信息增量(x,y,z)
+            delta_pose[3:6]: delta euler angles (roll, pitch, yaw)
+                             欧拉角增量（滚转、俯仰、偏航）
         Return:
-        - The target joint positions of the arm
+            result_QP: target joint positions computed by the IK solver
+                       逆运动学计算得到的机械臂目标关节位置
+            ee_length: distance from the arm base to the end-effector
+                       机械臂底座至末端执行器的距离
         """
         self.current_ee_pos[:] = self.data_arm.body("link6").xpos[:]
         self.current_ee_quat[:] = self.data_arm.body("link6").xquat[:]
@@ -284,12 +292,29 @@ class MJ_DCMM(object):
     def set_throw_pos_vel(self, 
                           pose = np.array([0, 0, 0, 1, 0, 0, 0]), 
                           velocity = np.array([0, 0, 0, 0, 0, 0])):
-        self.data.qpos[37:44] = pose
-        self.data.qvel[36:42] = velocity
+                """
+        Set the position and velocity for throwing action.
+        设置投掷动作的目标位置和速度。
+
+        Args:
+            pose: position and orientation for the object (quaternion format)
+                  物体的位置和姿态（四元数格式）
+            velocity: corresponding velocity of the object
+                      物体的速度信息
+        """
+        self.data.qpos[24:31] = pose
+        self.data.qvel[24:30] = velocity
+        # self.data.qpos[37:44] = pose
+        # self.data.qvel[36:42] = velocity
 
     def action_hand2qpos(self, action_hand):
         """
-        Convert the action of the hand to the joint positions.
+        Convert the hand action into joint position updates.
+        将手部动作转换为关节位置的更新。
+
+        Args:
+            action_hand: action changes for the hand joints
+                         手部各关节动作的增量数值
         """
         # Thumb
         self.target_hand_qpos[13] += action_hand[9]
@@ -353,17 +378,17 @@ class MJ_DCMM(object):
         """
         Initializes all camera parameters that only need to be calculated once.
         """
-
+        # Get camera ID from model / 从模型中获取摄像头ID
         cam_id = self.model.camera(camera).id
-        # Get field of view
+        # Get camera field of view (FOV) / 获取摄像头的视场角
         fovy = self.model.cam_fovy[cam_id]
-        # Calculate focal length
+        # Calculate focal length using image height and FOV / 根据图像高度和视场角计算焦距
         f = 0.5 * height / np.tan(fovy * np.pi / 360)
-        # Construct camera matrix
+        # Construct intrinsic camera matrix / 构造摄像机内参矩阵
         self.cam_matrix = np.array(((f, 0, width / 2), (0, f, height / 2), (0, 0, 1)))
-        # Rotation of camera in world coordinates
+        # Get and adjust camera rotation matrix / 获取并调整摄像头旋转矩阵
         self.cam_rot_mat = self.model.cam_mat0[cam_id]
         self.cam_rot_mat = np.reshape(self.cam_rot_mat, (3, 3)) @ np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
-        # Position of camera in world coordinates
+        # Calculate camera position in world coordinates / 计算摄像头在世界坐标中的位置
         self.cam_pos = self.model.cam_pos0[cam_id] + self.data.body("base_link").xpos - self.data.body("arm_base").xpos
         self.cam_init = True
