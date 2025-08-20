@@ -176,18 +176,25 @@ class DcmmVecEnv(gym.Env):
         else: self.Dcmm.viewer = None
 
         # Observations are dictionaries with the agent's and the object's state. (dim = 44)
-        hand_joint_indices = np.where(DcmmCfg.hand_mask == 1)[0] + 15
+        hand_joint_indices = np.where(DcmmCfg.hand_mask == 1)[0] + 8
+        # old
+        # hand_joint_indices = np.where(DcmmCfg.hand_mask == 1)[0] + 15
         self.observation_space = spaces.Dict(
             {
                 "base": spaces.Dict({
-                    "v_lin_2d": spaces.Box(-4, 4, shape=(2,), dtype=np.float32),
+                    "v_lin_2d": spaces.Box(-8, 8, shape=(2,), dtype=np.float32),
+                    # old
+                    #"v_lin_2d": spaces.Box(-4, 4, shape=(2,), dtype=np.float32),
                 }),
                 "arm": spaces.Dict({
                     "ee_pos3d": spaces.Box(-10, 10, shape=(3,), dtype=np.float32),
                     "ee_quat": spaces.Box(-1, 1, shape=(4,), dtype=np.float32),
                     "ee_v_lin_3d": spaces.Box(-1, 1, shape=(3,), dtype=np.float32),
-                    "joint_pos": spaces.Box(low = np.array([self.Dcmm.model.jnt_range[i][0] for i in range(9, 15)]),
-                                            high = np.array([self.Dcmm.model.jnt_range[i][1] for i in range(9, 15)]),
+                    "joint_pos": spaces.Box(low = np.array([self.Dcmm.model.jnt_range[i][0] for i in range(2, 8)]),
+                                            high = np.array([self.Dcmm.model.jnt_range[i][1] for i in range(2, 8)]),
+                    # old
+                    #"joint_pos": spaces.Box(low = np.array([self.Dcmm.model.jnt_range[i][0] for i in range(9, 15)]),
+                    #                        high = np.array([self.Dcmm.model.jnt_range[i][1] for i in range(9, 15)]),
                                             dtype=np.float32),
                 }),
                 "hand": spaces.Box(low = np.array([self.Dcmm.model.jnt_range[i][0] for i in hand_joint_indices]),
@@ -202,8 +209,11 @@ class DcmmVecEnv(gym.Env):
             }
         )
         # Define the limit for the mobile base action
-        base_low = np.array([-4, -4])
-        base_high = np.array([4, 4])
+        base_low = np.array([-8, -8])
+        base_high = np.array([8, 8])
+        # old
+        # base_low = np.array([-4, -4])
+        # base_high = np.array([4, 4])
         # Define the limit for the arm action
         arm_low = -0.025*np.ones(4)
         arm_high = 0.025*np.ones(4)
@@ -289,8 +299,7 @@ class DcmmVecEnv(gym.Env):
 
         # Random PID Params
         self.k_arm = np.ones(6)
-        self.k_drive = np.ones(4)
-        self.k_steer = np.ones(4)
+        self.k_drive = np.ones(1)
         self.k_hand = np.ones(1)
         # Random Obs & Act Params
         self.k_obs_base = DcmmCfg.k_obs_base
@@ -420,7 +429,9 @@ class DcmmVecEnv(gym.Env):
                 "ee_pos3d": ee_pos3d + np.random.normal(0, self.k_obs_arm, 3),
                 "ee_quat": self._get_relative_ee_quat() + np.random.normal(0, self.k_obs_arm, 4),
                 'ee_v_lin_3d': (ee_pos3d - self.prev_ee_pos3d)*self.fps + np.random.normal(0, self.k_obs_arm, 3),
-                "joint_pos": np.array(self.Dcmm.data.qpos[15:21]) + np.random.normal(0, self.k_obs_arm, 6),
+                "joint_pos": np.array(self.Dcmm.data.qpos[6:12]) + np.random.normal(0, self.k_obs_arm, 6),
+                # old
+                #"joint_pos": np.array(self.Dcmm.data.qpos[15:21]) + np.random.normal(0, self.k_obs_arm, 6),
             },
             "hand": self._get_hand_obs() + np.random.normal(0, self.k_obs_hand, 12),
             "object": {
@@ -437,20 +448,37 @@ class DcmmVecEnv(gym.Env):
         # return obs_tensor
 
     def _get_hand_obs(self):
-        # print("full hand: ", self.Dcmm.data.qpos[21:37])
+        # print("full hand: ", self.Dcmm.data.qpos[8:28])
         hand_obs = np.zeros(12)
         # Thumb
-        hand_obs[9] = self.Dcmm.data.qpos[21+13]
-        hand_obs[10] = self.Dcmm.data.qpos[21+14]
-        hand_obs[11] = self.Dcmm.data.qpos[21+15]
+        hand_obs[9] = self.Dcmm.data.qpos[8+13]
+        hand_obs[10] = self.Dcmm.data.qpos[8+14]
+        hand_obs[11] = self.Dcmm.data.qpos[8+15]
         # Other Three Fingers
-        hand_obs[0] = self.Dcmm.data.qpos[21]
-        hand_obs[1:3] = self.Dcmm.data.qpos[(21+2):(21+4)]
-        hand_obs[3] = self.Dcmm.data.qpos[21+4]
-        hand_obs[4:6] = self.Dcmm.data.qpos[(21+6):(21+8)]
-        hand_obs[6] = self.Dcmm.data.qpos[21+8]
-        hand_obs[7:9] = self.Dcmm.data.qpos[(21+10):(21+12)]
+        hand_obs[0] = self.Dcmm.data.qpos[8]
+        hand_obs[1:3] = self.Dcmm.data.qpos[(8+2):(8+4)]
+        hand_obs[3] = self.Dcmm.data.qpos[8+4]
+        hand_obs[4:6] = self.Dcmm.data.qpos[(8+6):(8+8)]
+        hand_obs[6] = self.Dcmm.data.qpos[8+8]
+        hand_obs[7:9] = self.Dcmm.data.qpos[(8+10):(8+12)]
         return hand_obs
+    
+    # old
+    # def _get_hand_obs(self):
+    #     # print("full hand: ", self.Dcmm.data.qpos[21:37])
+    #     hand_obs = np.zeros(12)
+    #     # Thumb
+    #     hand_obs[9] = self.Dcmm.data.qpos[21+13]
+    #     hand_obs[10] = self.Dcmm.data.qpos[21+14]
+    #     hand_obs[11] = self.Dcmm.data.qpos[21+15]
+    #     # Other Three Fingers
+    #     hand_obs[0] = self.Dcmm.data.qpos[21]
+    #     hand_obs[1:3] = self.Dcmm.data.qpos[(21+2):(21+4)]
+    #     hand_obs[3] = self.Dcmm.data.qpos[21+4]
+    #     hand_obs[4:6] = self.Dcmm.data.qpos[(21+6):(21+8)]
+    #     hand_obs[6] = self.Dcmm.data.qpos[21+8]
+    #     hand_obs[7:9] = self.Dcmm.data.qpos[(21+10):(21+12)]
+    #     return hand_obs
     
     def _get_info(self):
         # Time of the Mujoco environment
@@ -477,16 +505,29 @@ class DcmmVecEnv(gym.Env):
         self.action_buffer["hand"].append(copy.deepcopy(self.Dcmm.target_hand_qpos[:]))
 
     def _get_ctrl(self):
-        # Map the action to the control 
-        mv_steer, mv_drive = self.Dcmm.move_base_vel(self.action_buffer["base"][0]) # 8
-        mv_arm = self.Dcmm.arm_pid.update(self.action_buffer["arm"][0], self.Dcmm.data.qpos[15:21], self.Dcmm.data.time) # 6
-        mv_hand = self.Dcmm.hand_pid.update(self.action_buffer["hand"][0], self.Dcmm.data.qpos[21:37], self.Dcmm.data.time) # 16
-        ctrl = np.concatenate([mv_steer, mv_drive, mv_arm, mv_hand], axis=0)
-        # Add Action Noise (Scale with self.k_act)
-        ctrl *= np.random.normal(1, self.k_act, 30)
+        # old删除了所有的steer
+        # 将动作缓冲区中的第一个动作映射到控制指令
+        # 对底盘动作进行处理，返回舵机控制指令和驱动控制指令
+        mv_drive = self.Dcmm.move_base_vel(self.action_buffer["base"][0])  # 处理底盘动作，共8个参数 ，修改1，只需要2个参数
+        
+        # 计算手臂的控制命令，使用PID控制器更新目标与当前状态之间的误差
+        mv_arm = self.Dcmm.arm_pid.update(self.action_buffer["arm"][0], self.Dcmm.data.qpos[2:8], self.Dcmm.data.time)  # 更新手臂动作，共6个参数
+        
+        # 计算手的控制命令，使用PID控制器更新目标与当前状态之间的误差
+        mv_hand = self.Dcmm.hand_pid.update(self.action_buffer["hand"][0], self.Dcmm.data.qpos[8:24], self.Dcmm.data.time)  # 更新手动作，共16个参数
+        
+        # 合并所有控制命令
+        ctrl = np.concatenate([mv_drive, mv_arm, mv_hand], axis=0)
+        
+        # 根据控制参数的噪声因子添加噪声，放大或缩小控制命令
+        ctrl *= np.random.normal(1, self.k_act, 24)
+        
+        # 如果启用了打印控制命令的选项，则打印各部分的控制命令
         if self.print_ctrl:
             print("##### ctrl:")
-            print("mv_steer: {}, \nmv_drive: {}, \nmv_arm: {}, \nmv_hand: {}\n".format(mv_steer, mv_drive, mv_arm, mv_hand))
+            print("mv_drive: {}, \nmv_arm: {}, \nmv_hand: {}\n".format(mv_drive, mv_arm, mv_hand))
+        
+        # 返回最终的控制指令数组
         return ctrl
 
     def _reset_object(self):
@@ -559,12 +600,13 @@ class DcmmVecEnv(gym.Env):
     def random_PID(self):
         # Random the PID Controller Params in DCMM
         self.k_arm = np.random.uniform(0, 1, size=6)
-        self.k_drive = np.random.uniform(0, 1, size=4)
-        self.k_steer = np.random.uniform(0, 1, size=4)
+        self.k_drive = np.random.uniform(0, 1)
+        # old毕业前最多的问题，为什么赋值有四个的问题
+        # self.k_drive = np.random.uniform(0, 1, size=4)
+        # self.k_steer = np.random.uniform(0, 1, size=4)
         self.k_hand = np.random.uniform(0, 1, size=1)
         # Reset the PID Controller
         self.Dcmm.arm_pid.reset(self.k_arm*(DcmmCfg.k_arm[1]-DcmmCfg.k_arm[0])+DcmmCfg.k_arm[0])
-        self.Dcmm.steer_pid.reset(self.k_steer*(DcmmCfg.k_steer[1]-DcmmCfg.k_steer[0])+DcmmCfg.k_steer[0])
         self.Dcmm.drive_pid.reset(self.k_drive*(DcmmCfg.k_drive[1]-DcmmCfg.k_drive[0])+DcmmCfg.k_drive[0])
         self.Dcmm.hand_pid.reset(self.k_hand[0]*(DcmmCfg.k_hand[1]-DcmmCfg.k_hand[0])+DcmmCfg.k_hand[0])
     
@@ -588,8 +630,11 @@ class DcmmVecEnv(gym.Env):
             self.Dcmm.data_arm.act[:] = None
         self.Dcmm.data.ctrl = np.zeros(self.Dcmm.model.nu)
         self.Dcmm.data_arm.ctrl = np.zeros(self.Dcmm.model_arm.nu)
-        self.Dcmm.data.qpos[15:21] = DcmmCfg.arm_joints[:]
-        self.Dcmm.data.qpos[21:37] = DcmmCfg.hand_joints[:]
+        self.Dcmm.data.qpos[2:8] = DcmmCfg.arm_joints[:]
+        self.Dcmm.data.qpos[8:24] = DcmmCfg.hand_joints[:]
+        # old
+        # self.Dcmm.data.qpos[15:21] = DcmmCfg.arm_joints[:]
+        # self.Dcmm.data.qpos[21:37] = DcmmCfg.hand_joints[:]
         self.Dcmm.data_arm.qpos[0:6] = DcmmCfg.arm_joints[:]
         self.Dcmm.data.body("object").xpos[0:3] = np.array([2, 2, 1])
         # Random 3D position TODO: Adjust to the fov
@@ -622,7 +667,9 @@ class DcmmVecEnv(gym.Env):
         self.catch_time = self.Dcmm.data.time - self.start_time
 
         ## Reset the target velocity of the mobile base
-        self.Dcmm.target_base_vel = np.array([0.0, 0.0, 0.0])
+        self.Dcmm.target_base_vel = np.array([0.0, 0.0])        
+        # old
+        # self.Dcmm.target_base_vel = np.array([0.0, 0.0, 0.0])
         ## Reset the target joint positions of the arm
         self.Dcmm.target_arm_qpos[:] = DcmmCfg.arm_joints[:]
         ## Reset the target joint positions of the hand
@@ -651,7 +698,8 @@ class DcmmVecEnv(gym.Env):
         ctrl_delay = np.array([len(self.action_buffer['base']),
                                len(self.action_buffer['arm']),
                                len(self.action_buffer['hand'])])
-        info['ctrl_params'] = np.concatenate((self.k_arm, self.k_drive, self.k_hand, ctrl_delay))
+        
+        info['ctrl_params'] = np.concatenate((self.k_arm,[self.k_drive], self.k_hand, ctrl_delay))
 
         return observation, info
 
@@ -779,7 +827,9 @@ class DcmmVecEnv(gym.Env):
 
     def _step_mujoco_simulation(self, action_dict):
         ## TODO: Low-Pass-Filter the Base Velocity
-        self.Dcmm.target_base_vel[0:2] = action_dict['base']
+        self.Dcmm.target_base_vel = action_dict['base']
+        # old
+        # self.Dcmm.target_base_vel[0:2] = action_dict['base']
         action_arm = np.concatenate((action_dict["arm"], np.zeros(3)))
         result_QP, _ = self.Dcmm.move_ee_pose(action_arm)
         if result_QP[1]:
@@ -862,7 +912,7 @@ class DcmmVecEnv(gym.Env):
         ctrl_delay = np.array([len(self.action_buffer['base']),
                                len(self.action_buffer['arm']),
                                len(self.action_buffer['hand'])])
-        info['ctrl_params'] = np.concatenate((self.k_arm, self.k_drive, self.k_hand, ctrl_delay))
+        info['ctrl_params'] = np.concatenate((self.k_arm, [self.k_drive], self.k_hand, ctrl_delay))
         # The episode is truncated if the env_time is larger than the predefined time
         if self.task == "Catching":
             if info["env_time"] > self.env_time:
